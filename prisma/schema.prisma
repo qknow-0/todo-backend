@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  lastLoginAt  DateTime?
+
+  // Relations
+  createdTeams      Team[]          @relation("TeamCreatedBy")
+  teamMemberships   TeamMember[]
+  createdTasks      Task[]          @relation("TaskCreatedBy")
+  assignedTasks     Task[]          @relation("TaskAssignedTo")
+  watchedTasks      TaskWatcher[]
+  taskHistory       TaskHistory[]
+  comments          Comment[]
+
+  @@map("users")
+}
+
+model Team {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  avatarUrl   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  createdBy   User         @relation("TeamCreatedBy", fields: [createdById], references: [id])
+  createdById String
+  members     TeamMember[]
+  tasks       Task[]
+
+  @@map("teams")
+}
+
+model TeamMember {
+  id        String   @id @default(uuid())
+  role      String   @default("member") // owner, admin, member
+  joinedAt  DateTime @default(now())
+
+  // Relations
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  @@unique([teamId, userId])
+  @@map("team_members")
+}
+
+model Task {
+  id              String   @id @default(uuid())
+  title           String
+  description     String?
+  status          String   @default("todo") // todo, in_progress, done, archived
+  priority        String   @default("medium") // low, medium, high, urgent
+  dueDate         DateTime?
+  estimatedHours  Float?
+  actualHours     Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  completedAt     DateTime?
+
+  // Relations
+  parentTask   Task?      @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  parentTaskId String?
+  subtasks     Task[]     @relation("TaskSubtasks")
+
+  createdBy    User       @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  createdById  String
+
+  assignedTo   User?      @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+  assignedToId String?
+
+  team         Team?      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId       String?
+
+  watchers     TaskWatcher[]
+  history      TaskHistory[]
+  comments     Comment[]
+
+  @@map("tasks")
+}
+
+model TaskWatcher {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  // Relations
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  @@unique([taskId, userId])
+  @@map("task_watchers")
+}
+
+model TaskHistory {
+  id        String   @id @default(uuid())
+  action    String
+  oldValue  Json?
+  newValue  Json?
+  createdAt DateTime @default(now())
+
+  // Relations
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId String
+  user   User?  @relation(fields: [userId], references: [id])
+  userId String?
+
+  @@map("task_history")
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId      String
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  parent      Comment? @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  parentCommentId String?
+  replies     Comment[] @relation("CommentReplies")
+
+  @@map("comments")
+}
+

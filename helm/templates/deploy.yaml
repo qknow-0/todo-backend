@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: "{{ .Values.meta.app.name }}"
+  name: "{{ .Values.meta.app.name }}"
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: "{{ .Values.meta.app.name }}"
+  template:
+    metadata:
+      labels:
+        app: "{{ .Values.meta.app.name }}"
+    spec:
+      containers:
+      - image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        ports:
+        - containerPort: {{ .Values.container.port }}
+        name: "{{ .Values.meta.app.name }}"
+        resources:
+          requests:
+            memory: 2048Mi
+            cpu: 400m
+          limits:
+            memory: 4096Mi
+            cpu: 2000m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ .Values.meta.app.name }}"
+  labels:
+    name: "{{ .Values.meta.app.name }}"
+spec:
+  type: NodePort
+  ports:
+  - port: {{ .Values.container.port }}
+    targetPort: {{ .Values.container.port }}
+    nodePort: {{ .Values.container.nodePort }}
+    name: http
+  selector:
+    app: "{{ .Values.meta.app.name }}"
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: "{{ .Values.meta.app.name }}"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "{{ .Values.ingress.annotations.proxy_read_timeout }}"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: "{{ .Values.meta.app.name }}"
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            # 代理的服务名称
+            name: "{{ .Values.meta.app.name }}"
+            port:
+              # 服务端口
+              number: {{ .Values.container.port }}
